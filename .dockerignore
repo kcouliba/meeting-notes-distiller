@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.gitignore
+.claude
+docs
+data
+samples
+coverage
+*.md
+!README.md
+.env*.local
+.DS_Store
+__tests__
+jest.config.ts
+jest.setup.ts
+SPECS_*.md
