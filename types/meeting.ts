@@ -11,6 +11,7 @@ export interface MeetingReport {
   actions: Action[];
   pending: string[];
   participants: string[];
+  language: string;
 }
 
 export type OutputFormat = 'markdown' | 'slack' | 'email' | 'notion';

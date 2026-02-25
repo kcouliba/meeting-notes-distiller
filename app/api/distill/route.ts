@@ -59,6 +59,11 @@ export async function POST(req: Request) {
       );
     }
 
+    // Default language if AI omits it
+    if (!report.language || typeof report.language !== 'string') {
+      report.language = 'en';
+    }
+
     // Validate the structure
     if (
       !Array.isArray(report.summary) ||

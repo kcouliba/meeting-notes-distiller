@@ -35,6 +35,7 @@ const sampleReport: MeetingReport = {
   actions: [{ title: 'Prepare migration', task: 'Prepare migration plan', assignee: 'Bob', deadline: 'Jan 30' }],
   pending: ['Hire contractor?'],
   participants: ['Alice', 'Bob'],
+  language: 'en',
 };
 
 function makePostRequest(body: Record<string, unknown>): Request {

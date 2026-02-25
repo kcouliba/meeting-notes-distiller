@@ -1,9 +1,9 @@
 import { toMarkdown } from '@/lib/formatters/markdown';
-import { fullReport, emptyReport, minimalReport } from '../../fixtures/sampleReport';
+import { fullReport, emptyReport, minimalReport, frenchReport } from '../../fixtures/sampleReport';
 
 describe('toMarkdown', () => {
   it('formats a complete report correctly', () => {
-    const result = toMarkdown(fullReport);
+    const result = toMarkdown(fullReport, 'en');
 
     expect(result).toContain('# Meeting Report');
     expect(result).toContain('## Summary');
@@ -32,7 +32,7 @@ describe('toMarkdown', () => {
   });
 
   it('handles empty sections gracefully', () => {
-    const result = toMarkdown(emptyReport);
+    const result = toMarkdown(emptyReport, 'en');
 
     expect(result).toContain('# Meeting Report');
     // Should not contain section headers for empty arrays
@@ -44,7 +44,7 @@ describe('toMarkdown', () => {
   });
 
   it('handles actions without assignees or deadlines', () => {
-    const result = toMarkdown(minimalReport);
+    const result = toMarkdown(minimalReport, 'en');
 
     expect(result).toContain('Review the PR');
     // Should not have an assignee arrow when assignee is null
@@ -54,8 +54,24 @@ describe('toMarkdown', () => {
   });
 
   it('uses checkbox format for action items', () => {
-    const result = toMarkdown(fullReport);
+    const result = toMarkdown(fullReport, 'en');
 
     expect(result).toContain('- [ ] **Prepare the migration plan**');
+  });
+
+  it('formats a French report with French labels', () => {
+    const result = toMarkdown(frenchReport, 'fr');
+
+    expect(result).toContain('# Compte rendu de réunion');
+    expect(result).toContain('## Résumé');
+    expect(result).toContain('## Décisions');
+    expect(result).toContain('## Actions à mener');
+    expect(result).toContain('## Points en suspens');
+    expect(result).toContain('## Participants');
+
+    // Check French content is present
+    expect(result).toContain('Préparer le plan de migration');
+    expect(result).toContain('@Bob');
+    expect(result).toContain('pour le 30 jan.');
   });
 });

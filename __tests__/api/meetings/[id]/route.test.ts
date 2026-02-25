@@ -34,6 +34,7 @@ const sampleReport: MeetingReport = {
   actions: [{ title: 'Prepare plan', task: 'Prepare plan', assignee: 'Bob', deadline: 'Jan 30' }],
   pending: ['Hire contractor?'],
   participants: ['Alice', 'Bob'],
+  language: 'en',
 };
 
 function seedMeeting(id: string, title: string = 'Test Meeting') {

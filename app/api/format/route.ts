@@ -5,7 +5,7 @@ import { toEmail } from '@/lib/formatters/email';
 import { toNotion } from '@/lib/formatters/notion';
 import { NextResponse } from 'next/server';
 
-const formatters: Record<OutputFormat, (report: MeetingReport) => string> = {
+const formatters: Record<OutputFormat, (report: MeetingReport, language: string) => string> = {
   markdown: toMarkdown,
   slack: toSlack,
   email: toEmail,
@@ -36,7 +36,8 @@ export async function POST(req: Request) {
     }
 
     const formatter = formatters[format];
-    const formatted = formatter(report);
+    const language = report.language ?? 'en';
+    const formatted = formatter(report, language);
 
     return NextResponse.json({ formatted });
   } catch (error) {

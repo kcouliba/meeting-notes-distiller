@@ -22,6 +22,7 @@ function makeReport(overrides: Partial<MeetingReport> = {}): MeetingReport {
     ],
     participants: ['Alice', 'Bob', 'Charlie'],
     pending: ['Budget approval'],
+    language: 'en',
     ...overrides,
   };
 }

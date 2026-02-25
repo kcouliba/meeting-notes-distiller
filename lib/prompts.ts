@@ -24,12 +24,14 @@ Return ONLY valid JSON matching this exact structure:
     {"title": "short title", "task": "description", "assignee": "name or null", "deadline": "date or null"}
   ],
   "pending": ["item 1", "item 2"],
-  "participants": ["name 1", "name 2"]
+  "participants": ["name 1", "name 2"],
+  "language": "ISO 639-1 code (e.g. en, fr)"
 }
 
 Important rules:
 - All arrays must be present even if empty
-- Handle both English and French notes
+- Detect the language of the input notes and set the "language" field to its ISO 639-1 code (e.g. "en" for English, "fr" for French)
+- Respond in the same language as the input notes — all summary points, decisions, action descriptions, and pending items must be written in the detected language
 - Be robust with messy, informal, or abbreviated notes
 - Infer structure from context when formatting is poor
 - Do not invent information that is not in the notes

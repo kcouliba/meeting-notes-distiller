@@ -18,6 +18,7 @@ const fullReport: MeetingReport = {
   ],
   pending: ['Need to hire a contractor for frontend work?'],
   participants: ['Alice', 'Bob', 'Charlie'],
+  language: 'en',
 };
 
 describe('meetings database', () => {

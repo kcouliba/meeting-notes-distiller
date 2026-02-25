@@ -20,6 +20,7 @@ export const fullReport: MeetingReport = {
     'Timeline for security audit unclear',
   ],
   participants: ['Alice', 'Bob', 'Charlie'],
+  language: 'en',
 };
 
 export const emptyReport: MeetingReport = {
@@ -28,6 +29,7 @@ export const emptyReport: MeetingReport = {
   actions: [],
   pending: [],
   participants: [],
+  language: 'en',
 };
 
 export const minimalReport: MeetingReport = {
@@ -38,4 +40,25 @@ export const minimalReport: MeetingReport = {
   ],
   pending: [],
   participants: ['Alice'],
+  language: 'en',
+};
+
+export const frenchReport: MeetingReport = {
+  summary: [
+    'Discussion de la feuille de route T1 et approbation des initiatives clés',
+    'Adoption du nouveau pipeline CI/CD prévue pour fin février',
+  ],
+  decisions: [
+    'Adopter le nouveau pipeline CI/CD d\'ici fin février',
+    'Budget marketing approuvé à 50 000 €',
+  ],
+  actions: [
+    { title: 'Préparer migration', task: 'Préparer le plan de migration', assignee: 'Bob', deadline: '30 jan.' },
+    { title: 'Envoyer maquettes', task: 'Envoyer les maquettes au client', assignee: 'Charlie', deadline: '5 fév.' },
+  ],
+  pending: [
+    'Besoin de recruter un prestataire pour le frontend ?',
+  ],
+  participants: ['Alice', 'Bob', 'Charlie'],
+  language: 'fr',
 };
