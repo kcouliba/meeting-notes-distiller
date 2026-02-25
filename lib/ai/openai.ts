@@ -16,6 +16,7 @@ export function createOpenAIProvider(): AIProviderClient {
     async generate(notes: string): Promise<string> {
       const response = await client.chat.completions.create({
         model: modelName,
+        temperature: 0.2,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },

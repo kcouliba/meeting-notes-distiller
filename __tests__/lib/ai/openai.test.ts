@@ -52,6 +52,7 @@ describe('createOpenAIProvider', () => {
 
     expect(mockCreate).toHaveBeenCalledWith({
       model: 'gpt-4o-mini',
+      temperature: 0.2,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: 'test prompt' },

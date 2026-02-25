@@ -44,6 +44,7 @@ export function createOllamaProvider(): AIProviderClient {
           ],
           format: RESPONSE_SCHEMA,
           stream: false,
+          options: { temperature: 0.2 },
         }),
       });
 

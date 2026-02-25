@@ -15,6 +15,7 @@ export function createGeminiProvider(): AIProviderClient {
     systemInstruction: SYSTEM_PROMPT,
     generationConfig: {
       responseMimeType: 'application/json',
+      temperature: 0.2,
     },
   });
 
