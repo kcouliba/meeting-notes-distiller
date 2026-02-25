@@ -1,9 +1,10 @@
 import Database from 'better-sqlite3';
 import { drizzle, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import path from 'path';
 import fs from 'fs';
 import * as schema from './schema';
-import { ensureTables, backfillTasks } from './migrate';
+import { backfillTasks } from './migrate';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'meetings.db');
 
@@ -22,10 +23,9 @@ export function getDb(): DrizzleDb {
     rawDb.pragma('journal_mode = WAL');
     rawDb.pragma('foreign_keys = ON');
 
-    ensureTables(rawDb);
-    backfillTasks(rawDb);
-
     db = drizzle(rawDb, { schema });
+    migrate(db, { migrationsFolder: path.join(process.cwd(), 'drizzle') });
+    backfillTasks(rawDb);
   }
   return db;
 }

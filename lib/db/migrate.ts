@@ -1,37 +1,6 @@
 import type Database from 'better-sqlite3';
 import { MeetingReport } from '@/types/meeting';
 
-export function ensureTables(db: Database.Database): void {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS meetings (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      raw_notes TEXT NOT NULL,
-      report_json TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_meetings_created_at ON meetings(created_at DESC);
-
-    CREATE TABLE IF NOT EXISTS tasks (
-      id TEXT PRIMARY KEY,
-      meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
-      task TEXT NOT NULL,
-      assignee TEXT,
-      deadline TEXT,
-      status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo','in_progress','in_review','done')),
-      position INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-    CREATE INDEX IF NOT EXISTS idx_tasks_meeting_id ON tasks(meeting_id);
-    CREATE INDEX IF NOT EXISTS idx_tasks_status_position ON tasks(status, position);
-  `);
-}
-
 export function backfillTasks(db: Database.Database): void {
   const meetings = db.prepare(
     `SELECT m.id, m.report_json FROM meetings m
