@@ -2,57 +2,44 @@
  * @jest-environment node
  */
 import Database from 'better-sqlite3';
+import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { createTestDb } from '@/__tests__/helpers/test-db';
+import { MeetingsRepository } from '@/lib/repositories/meetings.repository';
+import { TasksRepository } from '@/lib/repositories/tasks.repository';
+import * as schema from '@/lib/db/schema';
 
-let testDb: Database.Database;
+let testDb: BetterSQLite3Database<typeof schema>;
+let rawDb: Database.Database;
 
 function resetDb() {
-  if (testDb) testDb.close();
-  testDb = new Database(':memory:');
-  testDb.pragma('journal_mode = WAL');
-  testDb.pragma('foreign_keys = ON');
-  testDb.exec(`
-    CREATE TABLE IF NOT EXISTS meetings (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      raw_notes TEXT NOT NULL,
-      report_json TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS tasks (
-      id TEXT PRIMARY KEY,
-      meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
-      task TEXT NOT NULL,
-      assignee TEXT,
-      deadline TEXT,
-      status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo','in_progress','in_review','done')),
-      position INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
+  if (rawDb) rawDb.close();
+  const result = createTestDb();
+  testDb = result.db;
+  rawDb = result.rawDb;
 }
 
-jest.mock('@/lib/db', () => ({
-  getDb: () => testDb,
+jest.mock('@/lib/repositories', () => ({
+  getRepositories: () => ({
+    meetings: new MeetingsRepository(testDb),
+    tasks: new TasksRepository(testDb),
+  }),
 }));
 
 import { GET } from '@/app/api/tasks/route';
 
 function seedData() {
-  testDb.prepare(
+  rawDb.prepare(
     `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run('m-1', 'Sprint Planning', 'notes', '{}', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
 
-  testDb.prepare(
+  rawDb.prepare(
     `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run('m-2', 'Standup', 'notes', '{}', '2026-01-02T00:00:00.000Z', '2026-01-02T00:00:00.000Z');
 
   const now = '2026-01-01T00:00:00.000Z';
-  const insert = testDb.prepare(
+  const insert = rawDb.prepare(
     `INSERT INTO tasks (id, meeting_id, task, assignee, deadline, status, position, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
@@ -74,7 +61,7 @@ describe('GET /api/tasks', () => {
     resetDb();
     seedData();
   });
-  afterAll(() => testDb?.close());
+  afterAll(() => rawDb?.close());
 
   it('returns all tasks with meeting titles', async () => {
     const res = await GET(makeGetRequest());
@@ -106,7 +93,7 @@ describe('GET /api/tasks', () => {
   });
 
   it('returns empty array when no tasks exist', async () => {
-    testDb.exec('DELETE FROM tasks');
+    rawDb.exec('DELETE FROM tasks');
 
     const res = await GET(makeGetRequest());
     const body = await res.json();

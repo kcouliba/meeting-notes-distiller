@@ -2,7 +2,10 @@
  * @jest-environment node
  */
 import Database from 'better-sqlite3';
+import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { MeetingReport } from '@/types/meeting';
+import { createTestDb } from '@/__tests__/helpers/test-db';
+import * as schema from '@/lib/db/schema';
 
 const fullReport: MeetingReport = {
   summary: [
@@ -17,52 +20,22 @@ const fullReport: MeetingReport = {
   participants: ['Alice', 'Bob', 'Charlie'],
 };
 
-function createTestDb(): Database.Database {
-  const db = new Database(':memory:');
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS meetings (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      raw_notes TEXT NOT NULL,
-      report_json TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_meetings_created_at ON meetings(created_at DESC);
-
-    CREATE TABLE IF NOT EXISTS tasks (
-      id TEXT PRIMARY KEY,
-      meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
-      task TEXT NOT NULL,
-      assignee TEXT,
-      deadline TEXT,
-      status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo','in_progress','in_review','done')),
-      position INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-    CREATE INDEX IF NOT EXISTS idx_tasks_meeting_id ON tasks(meeting_id);
-    CREATE INDEX IF NOT EXISTS idx_tasks_status_position ON tasks(status, position);
-  `);
-  return db;
-}
-
 describe('meetings database', () => {
-  let db: Database.Database;
+  let db: BetterSQLite3Database<typeof schema>;
+  let rawDb: Database.Database;
 
   beforeEach(() => {
-    db = createTestDb();
+    const result = createTestDb();
+    db = result.db;
+    rawDb = result.rawDb;
   });
 
   afterEach(() => {
-    db.close();
+    rawDb.close();
   });
 
   it('creates the meetings table via migration', () => {
-    const tables = db
+    const tables = rawDb
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='meetings'")
       .all() as { name: string }[];
     expect(tables).toHaveLength(1);
@@ -76,12 +49,12 @@ describe('meetings database', () => {
     const reportJson = JSON.stringify(fullReport);
     const now = new Date().toISOString();
 
-    db.prepare(
+    rawDb.prepare(
       `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run(id, title, rawNotes, reportJson, now, now);
 
-    const row = db.prepare('SELECT * FROM meetings WHERE id = ?').get(id) as {
+    const row = rawDb.prepare('SELECT * FROM meetings WHERE id = ?').get(id) as {
       id: string;
       title: string;
       raw_notes: string;
@@ -99,7 +72,7 @@ describe('meetings database', () => {
   });
 
   it('lists meetings sorted by created_at descending', () => {
-    const insert = db.prepare(
+    const insert = rawDb.prepare(
       `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     );
@@ -108,7 +81,7 @@ describe('meetings database', () => {
     insert.run('id-2', 'Second', 'notes', '{}', '2026-02-01T00:00:00.000Z', '2026-02-01T00:00:00.000Z');
     insert.run('id-3', 'Third', 'notes', '{}', '2026-03-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z');
 
-    const rows = db.prepare(
+    const rows = rawDb.prepare(
       'SELECT id, title FROM meetings ORDER BY created_at DESC'
     ).all() as { id: string; title: string }[];
 
@@ -119,27 +92,27 @@ describe('meetings database', () => {
   });
 
   it('deletes a meeting by ID', () => {
-    db.prepare(
+    rawDb.prepare(
       `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run('del-1', 'To Delete', 'notes', '{}', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
 
-    const before = db.prepare('SELECT COUNT(*) as count FROM meetings').get() as { count: number };
+    const before = rawDb.prepare('SELECT COUNT(*) as count FROM meetings').get() as { count: number };
     expect(before.count).toBe(1);
 
-    db.prepare('DELETE FROM meetings WHERE id = ?').run('del-1');
+    rawDb.prepare('DELETE FROM meetings WHERE id = ?').run('del-1');
 
-    const after = db.prepare('SELECT COUNT(*) as count FROM meetings').get() as { count: number };
+    const after = rawDb.prepare('SELECT COUNT(*) as count FROM meetings').get() as { count: number };
     expect(after.count).toBe(0);
   });
 
   it('returns undefined for non-existent ID', () => {
-    const row = db.prepare('SELECT * FROM meetings WHERE id = ?').get('nonexistent');
+    const row = rawDb.prepare('SELECT * FROM meetings WHERE id = ?').get('nonexistent');
     expect(row).toBeUndefined();
   });
 
   it('supports pagination with LIMIT and OFFSET', () => {
-    const insert = db.prepare(
+    const insert = rawDb.prepare(
       `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     );
@@ -149,14 +122,14 @@ describe('meetings database', () => {
       insert.run(`id-${i}`, `Meeting ${i}`, 'notes', '{}', date, date);
     }
 
-    const page1 = db.prepare(
+    const page1 = rawDb.prepare(
       'SELECT id FROM meetings ORDER BY created_at DESC LIMIT ? OFFSET ?'
     ).all(2, 0) as { id: string }[];
     expect(page1).toHaveLength(2);
     expect(page1[0].id).toBe('id-5');
     expect(page1[1].id).toBe('id-4');
 
-    const page2 = db.prepare(
+    const page2 = rawDb.prepare(
       'SELECT id FROM meetings ORDER BY created_at DESC LIMIT ? OFFSET ?'
     ).all(2, 2) as { id: string }[];
     expect(page2).toHaveLength(2);
@@ -182,25 +155,28 @@ describe('meetings database', () => {
 });
 
 describe('tasks database', () => {
-  let db: Database.Database;
+  let db: BetterSQLite3Database<typeof schema>;
+  let rawDb: Database.Database;
 
   beforeEach(() => {
-    db = createTestDb();
+    const result = createTestDb();
+    db = result.db;
+    rawDb = result.rawDb;
   });
 
   afterEach(() => {
-    db.close();
+    rawDb.close();
   });
 
   function insertMeeting(id: string) {
-    db.prepare(
+    rawDb.prepare(
       `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run(id, 'Test Meeting', 'notes', JSON.stringify(fullReport), '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
   }
 
   it('creates the tasks table via migration', () => {
-    const tables = db
+    const tables = rawDb
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'")
       .all() as { name: string }[];
     expect(tables).toHaveLength(1);
@@ -211,12 +187,12 @@ describe('tasks database', () => {
     insertMeeting('m-1');
     const now = new Date().toISOString();
 
-    db.prepare(
+    rawDb.prepare(
       `INSERT INTO tasks (id, meeting_id, task, assignee, deadline, status, position, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('t-1', 'm-1', 'Write tests', 'Alice', 'Feb 1', 'todo', 0, now, now);
 
-    const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get('t-1') as {
+    const row = rawDb.prepare('SELECT * FROM tasks WHERE id = ?').get('t-1') as {
       id: string;
       meeting_id: string;
       task: string;
@@ -239,22 +215,22 @@ describe('tasks database', () => {
     insertMeeting('m-1');
     const now = new Date().toISOString();
 
-    db.prepare(
+    rawDb.prepare(
       `INSERT INTO tasks (id, meeting_id, task, status, position, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run('t-1', 'm-1', 'Task 1', 'todo', 0, now, now);
 
-    db.prepare(
+    rawDb.prepare(
       `INSERT INTO tasks (id, meeting_id, task, status, position, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run('t-2', 'm-1', 'Task 2', 'todo', 1, now, now);
 
-    const before = db.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number };
+    const before = rawDb.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number };
     expect(before.count).toBe(2);
 
-    db.prepare('DELETE FROM meetings WHERE id = ?').run('m-1');
+    rawDb.prepare('DELETE FROM meetings WHERE id = ?').run('m-1');
 
-    const after = db.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number };
+    const after = rawDb.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number };
     expect(after.count).toBe(0);
   });
 
@@ -263,7 +239,7 @@ describe('tasks database', () => {
     const now = new Date().toISOString();
 
     expect(() => {
-      db.prepare(
+      rawDb.prepare(
         `INSERT INTO tasks (id, meeting_id, task, status, position, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).run('t-1', 'm-1', 'Task', 'invalid_status', 0, now, now);

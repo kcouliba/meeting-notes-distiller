@@ -28,7 +28,34 @@ npm test
 npm run test:watch
 ```
 
-All 33 tests must pass before submitting a PR.
+All 146 tests must pass before submitting a PR.
+
+## Project Architecture
+
+### Database Layer
+
+The app uses **SQLite** via `better-sqlite3` with **Drizzle ORM** as a type-safe query builder.
+
+- **Schema definition:** `lib/db/schema.ts` — Drizzle table definitions for `meetings` and `tasks`
+- **Connection singleton:** `lib/db/index.ts` — `getDb()` returns a Drizzle DB instance wrapping `better-sqlite3`
+- **Migrations:** `lib/db/migrate.ts` — table creation (`ensureTables()`) and data backfill (`backfillTasks()`)
+- **Drizzle config:** `drizzle.config.ts` — for `drizzle-kit` introspection and future schema management
+
+The database file is stored at `data/meetings.db` with WAL journaling and foreign keys enabled.
+
+### Repository Pattern
+
+Data access is separated from route handlers using the repository pattern:
+
+- `lib/repositories/meetings.repository.ts` — `MeetingsRepository` (create, findById, list, delete)
+- `lib/repositories/tasks.repository.ts` — `TasksRepository` (list, update, delete, reorder)
+- `lib/repositories/index.ts` — `getRepositories()` factory that returns both repositories
+
+API route handlers are thin HTTP wrappers: they parse the request, call the repository, and return the response.
+
+### Testing
+
+Tests use in-memory SQLite databases via a shared helper (`__tests__/helpers/test-db.ts`). API route tests mock the repository layer rather than the database directly.
 
 ## Code Style
 

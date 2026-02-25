@@ -2,46 +2,28 @@
  * @jest-environment node
  */
 import Database from 'better-sqlite3';
+import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { MeetingReport } from '@/types/meeting';
+import { createTestDb } from '@/__tests__/helpers/test-db';
+import { MeetingsRepository } from '@/lib/repositories/meetings.repository';
+import { TasksRepository } from '@/lib/repositories/tasks.repository';
+import * as schema from '@/lib/db/schema';
 
-// Create in-memory DB before mocking
-let testDb: Database.Database;
+let testDb: BetterSQLite3Database<typeof schema>;
+let rawDb: Database.Database;
 
 function resetDb() {
-  if (testDb) testDb.close();
-  testDb = new Database(':memory:');
-  testDb.pragma('journal_mode = WAL');
-  testDb.pragma('foreign_keys = ON');
-  testDb.exec(`
-    CREATE TABLE IF NOT EXISTS meetings (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      raw_notes TEXT NOT NULL,
-      report_json TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_meetings_created_at ON meetings(created_at DESC);
-
-    CREATE TABLE IF NOT EXISTS tasks (
-      id TEXT PRIMARY KEY,
-      meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
-      task TEXT NOT NULL,
-      assignee TEXT,
-      deadline TEXT,
-      status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo','in_progress','in_review','done')),
-      position INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-    CREATE INDEX IF NOT EXISTS idx_tasks_meeting_id ON tasks(meeting_id);
-    CREATE INDEX IF NOT EXISTS idx_tasks_status_position ON tasks(status, position);
-  `);
+  if (rawDb) rawDb.close();
+  const result = createTestDb();
+  testDb = result.db;
+  rawDb = result.rawDb;
 }
 
-jest.mock('@/lib/db', () => ({
-  getDb: () => testDb,
+jest.mock('@/lib/repositories', () => ({
+  getRepositories: () => ({
+    meetings: new MeetingsRepository(testDb),
+    tasks: new TasksRepository(testDb),
+  }),
 }));
 
 // Import after mock setup
@@ -73,7 +55,7 @@ function makeGetRequest(params?: Record<string, string>): Request {
 
 describe('POST /api/meetings', () => {
   beforeEach(() => resetDb());
-  afterAll(() => testDb?.close());
+  afterAll(() => rawDb?.close());
 
   it('creates a meeting and returns 201', async () => {
     const req = makePostRequest({ rawNotes: 'Some notes', report: sampleReport });
@@ -150,7 +132,7 @@ describe('POST /api/meetings', () => {
     const res = await POST(req);
     const body = await res.json();
 
-    const row = testDb.prepare('SELECT * FROM meetings WHERE id = ?').get(body.id) as {
+    const row = rawDb.prepare('SELECT * FROM meetings WHERE id = ?').get(body.id) as {
       id: string;
       raw_notes: string;
       report_json: string;
@@ -166,7 +148,7 @@ describe('POST /api/meetings', () => {
     const res = await POST(req);
     const body = await res.json();
 
-    const tasks = testDb.prepare('SELECT * FROM tasks WHERE meeting_id = ?').all(body.id) as {
+    const tasks = rawDb.prepare('SELECT * FROM tasks WHERE meeting_id = ?').all(body.id) as {
       id: string;
       task: string;
       assignee: string | null;
@@ -187,7 +169,7 @@ describe('POST /api/meetings', () => {
     const res = await POST(req);
     const body = await res.json();
 
-    const tasks = testDb.prepare('SELECT * FROM tasks WHERE meeting_id = ?').all(body.id) as unknown[];
+    const tasks = rawDb.prepare('SELECT * FROM tasks WHERE meeting_id = ?').all(body.id) as unknown[];
     expect(tasks).toHaveLength(0);
   });
 });
@@ -196,7 +178,7 @@ describe('GET /api/meetings', () => {
   beforeEach(() => {
     resetDb();
     // Seed 3 meetings
-    const insert = testDb.prepare(
+    const insert = rawDb.prepare(
       `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     );
@@ -204,7 +186,7 @@ describe('GET /api/meetings', () => {
     insert.run('id-2', 'Second', 'notes2', JSON.stringify(sampleReport), '2026-02-01T00:00:00.000Z', '2026-02-01T00:00:00.000Z');
     insert.run('id-3', 'Third', 'notes3', JSON.stringify(sampleReport), '2026-03-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z');
   });
-  afterAll(() => testDb?.close());
+  afterAll(() => rawDb?.close());
 
   it('returns paginated list of meetings', async () => {
     const req = makeGetRequest();
@@ -266,7 +248,7 @@ describe('GET /api/meetings', () => {
   });
 
   it('returns empty list when no meetings exist', async () => {
-    testDb.exec('DELETE FROM meetings');
+    rawDb.exec('DELETE FROM meetings');
 
     const req = makeGetRequest();
     const res = await GET(req);

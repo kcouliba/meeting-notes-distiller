@@ -11,7 +11,7 @@ Meeting Notes Distiller is a web application that transforms raw, disorganized m
 - **Zero setup** - No bots to install, no integrations to configure. Paste and go.
 - **Multi-format output** - Markdown, Slack, Email, and Notion-ready formatting.
 - **Smart extraction** - Identifies decisions, action items with assignees and deadlines, and open questions.
-- **Privacy by design** - No permanent storage of notes. Ephemeral, session-only processing.
+- **Privacy by design** - All data stays local in a SQLite database. Self-hosted, no cloud dependency.
 - **Source-agnostic** - Works with any transcript: Zoom, Teams, Otter, manual notes, or any pasted text.
 
 ---
@@ -100,17 +100,19 @@ Meeting Notes Distiller is a web application that transforms raw, disorganized m
 | Download .md | Export as Markdown file |
 | Responsive layout | Works on desktop and tablet |
 | Loading state | Streaming indicator during processing |
+| SQLite meeting history | Auto-save reports, browse/delete past meetings |
+| Kanban task board | Drag-and-drop board for managing action items across statuses |
 | Rate limiting | 3 reports per day (free tier), rate limiting per IP |
-| Privacy notice | Clear messaging about ephemeral processing |
+| Privacy notice | Clear messaging about local-only processing |
 
 ### Out of Scope (Deferred — see Roadmap in Section 12)
 
 | Feature | Roadmap Step |
 |---------|--------------|
-| Transcript file upload (VTT, SRT, TXT) | Step 1 |
-| SQLite-backed meeting history | Step 2 |
-| Open-source launch (README, community) | Step 3 |
-| Docker one-liner deployment | Step 4 |
+| ~~Transcript file upload (VTT, SRT, TXT)~~ | ~~Step 1~~ ✅ Done |
+| ~~SQLite-backed meeting history~~ | ~~Step 2~~ ✅ Done |
+| ~~Open-source launch (README, community)~~ | ~~Step 3~~ ✅ Done |
+| ~~Docker one-liner deployment~~ | ~~Step 4~~ ✅ Done |
 | User auth + cloud hosted version | Step 5 |
 | Search across meetings | Step 6 |
 | Community-driven features (PM integrations, templates, etc.) | Step 7 |
@@ -177,7 +179,9 @@ The app uses a **single-page, two-panel layout**:
 - **Component library:** shadcn/ui
 - **Styling:** Tailwind CSS
 - **Typography:** System font stack (Inter or similar sans-serif)
-- **Color scheme:** Light mode only for MVP. Neutral palette with accent color for CTAs.
+- **Color scheme:** Light/dark mode via next-themes
+- **Database:** SQLite via better-sqlite3 + Drizzle ORM
+- **Drag and drop:** @dnd-kit (Kanban board)
 
 ### Empty States
 
@@ -244,6 +248,55 @@ Processes raw meeting notes and returns a structured report.
 - System prompt passed via `systemInstruction` in model config
 - Apply rate limiting per IP address (3 requests/day for free tier)
 
+### Meeting History API
+
+#### POST /api/meetings
+Save a distilled meeting report.
+
+**Request:** `{ "rawNotes": "string", "report": MeetingReport }`
+**Response (201):** `{ "id": "uuid", "title": "string", "createdAt": "ISO date" }`
+
+#### GET /api/meetings
+List meetings with pagination.
+
+**Query params:** `page` (default 1), `pageSize` (default 20, max 100)
+**Response (200):** `{ "meetings": MeetingListItem[], "total": number, "page": number, "pageSize": number }`
+
+#### GET /api/meetings/[id]
+Get a single meeting with full report.
+
+**Response (200):** `MeetingRecord` | **404** if not found
+
+#### DELETE /api/meetings/[id]
+Delete a meeting and its associated tasks (CASCADE).
+
+**Response (200):** `{ "deleted": true }` | **404** if not found
+
+### Tasks / Kanban API
+
+#### GET /api/tasks
+List all tasks, optionally filtered by status.
+
+**Query params:** `status` (comma-separated: `todo,in_progress,in_review,done`)
+**Response (200):** `{ "tasks": TaskRecord[] }`
+
+#### PATCH /api/tasks/[id]
+Update task fields (status, position, assignee, deadline).
+
+**Request:** `{ "status?": TaskStatus, "position?": number, "assignee?": string|null, "deadline?": string|null }`
+**Response (200):** `{ "success": true }` | **404** if not found
+
+#### DELETE /api/tasks/[id]
+Delete a single task.
+
+**Response (200):** `{ "success": true }` | **404** if not found
+
+#### POST /api/tasks/reorder
+Batch update task statuses and positions (for drag-and-drop). Runs in a transaction.
+
+**Request:** `{ "updates": [{ "id": "string", "status": TaskStatus, "position": number }] }`
+**Response (200):** `{ "success": true }`
+
 ### POST /api/format
 
 Converts a structured report into a specific output format. This is a **client-side only** operation for MVP (no API call needed). Included here for reference if server-side formatting is desired later.
@@ -270,37 +323,67 @@ Converts a structured report into a specific output format. This is a **client-s
 ```typescript
 // types/meeting.ts
 
-export interface MeetingReport {
-  summary: string;
-  decisions: Decision[];
-  actions: Action[];
-  pendingItems: string[];
-  participants: string[];
-}
-
-export interface Decision {
-  description: string;
-  madeBy?: string;
-}
-
 export interface Action {
   task: string;
-  assignee: string;
-  deadline?: string;
-  priority?: "high" | "medium" | "low";
+  assignee: string | null;
+  deadline: string | null;
+}
+
+export interface MeetingReport {
+  summary: string[];
+  decisions: string[];
+  actions: Action[];
+  pending: string[];
+  participants: string[];
 }
 
 export type OutputFormat = "markdown" | "slack" | "email" | "notion";
 
-export interface DistillRequest {
-  notes: string;
-  language?: "auto" | "fr" | "en";
+// --- Meeting History Types ---
+
+export interface MeetingRecord {
+  id: string;
+  title: string;
+  rawNotes: string;
+  report: MeetingReport;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface DistillResponse extends MeetingReport {}
+export interface MeetingListItem {
+  id: string;
+  title: string;
+  createdAt: string;
+  participantCount: number;
+  actionCount: number;
+}
 
-export interface ApiError {
-  error: string;
+export interface MeetingListResponse {
+  meetings: MeetingListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+// --- Task / Kanban Types ---
+
+export type TaskStatus = "todo" | "in_progress" | "in_review" | "done";
+
+export interface TaskRecord {
+  id: string;
+  meetingId: string;
+  meetingTitle: string;
+  task: string;
+  assignee: string | null;
+  deadline: string | null;
+  status: TaskStatus;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskListResponse {
+  tasks: TaskRecord[];
 }
 ```
 
@@ -611,7 +694,7 @@ Existing tools (Otter, Fireflies, tl;dv) own the recording pipeline — they joi
 | Cloud | ~$8/mo | Hosted version, history, search |
 | Enterprise | Custom | SSO, audit trail, SLA, on-prem support |
 
-### Step 1 — File Upload (remove friction)
+### Step 1 — File Upload (remove friction) ✅ COMPLETED
 
 Accept transcript files directly instead of paste-only.
 
@@ -620,7 +703,7 @@ Accept transcript files directly instead of paste-only.
 - Auto-detect file format and extract text content
 - **Why:** Most users have a file, not clipboard text. This removes the biggest UX friction.
 
-### Step 2 — SQLite-Backed Meeting History (immediate value)
+### Step 2 — SQLite-Backed Meeting History (immediate value) ✅ COMPLETED
 
 Add persistence without the complexity of auth or external databases.
 
@@ -631,7 +714,7 @@ Add persistence without the complexity of auth or external databases.
 - No auth required — single-user / local-first by default
 - **Why:** Gives the app memory. Users come back because their history is there. Minimal complexity.
 
-### Step 3 — Open-Source Launch (community building)
+### Step 3 — Open-Source Launch (community building) ✅ COMPLETED
 
 Ship it publicly and let the community validate the product.
 
@@ -641,7 +724,7 @@ Ship it publicly and let the community validate the product.
 - Set up GitHub Issues for feature requests
 - **Why:** Real users give real feedback. Community traction is the best signal for what to build next.
 
-### Step 4 — Docker One-Liner Deployment (self-hosted)
+### Step 4 — Docker One-Liner Deployment (self-hosted) ✅ COMPLETED
 
 Make it trivially easy for anyone to run.
 
@@ -686,10 +769,10 @@ Stop guessing. Build what people ask for.
 
 | Step | What | Outcome |
 |------|------|---------|
-| 1 | File upload | Usable — removes friction |
-| 2 | SQLite history | Valuable — users come back |
-| 3 | Open-source launch | Validated — real user feedback |
-| 4 | Docker deployment | Accessible — self-hosted market |
+| 1 | File upload | ✅ Usable — removes friction |
+| 2 | SQLite history | ✅ Valuable — users come back |
+| 3 | Open-source launch | ✅ Validated — real user feedback |
+| 4 | Docker deployment | ✅ Accessible — self-hosted market |
 | 5 | Auth + cloud hosted | Revenue — first paying users |
 | 6 | Cross-meeting search | Sticky — hard to leave |
 | 7 | Community-driven features | Sustainable — build what's needed |

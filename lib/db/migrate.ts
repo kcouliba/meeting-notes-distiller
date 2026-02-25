@@ -1,27 +1,7 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import type Database from 'better-sqlite3';
 import { MeetingReport } from '@/types/meeting';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'meetings.db');
-
-let db: Database.Database | null = null;
-
-export function getDb(): Database.Database {
-  if (!db) {
-    const dir = path.dirname(DB_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-    migrate(db);
-  }
-  return db;
-}
-
-function migrate(db: Database.Database): void {
+export function ensureTables(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS meetings (
       id TEXT PRIMARY KEY,
@@ -50,11 +30,9 @@ function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_tasks_meeting_id ON tasks(meeting_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_status_position ON tasks(status, position);
   `);
-
-  backfillTasks(db);
 }
 
-function backfillTasks(db: Database.Database): void {
+export function backfillTasks(db: Database.Database): void {
   const meetings = db.prepare(
     `SELECT m.id, m.report_json FROM meetings m
      WHERE NOT EXISTS (SELECT 1 FROM tasks t WHERE t.meeting_id = m.id)`

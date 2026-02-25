@@ -2,30 +2,28 @@
  * @jest-environment node
  */
 import Database from 'better-sqlite3';
+import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { MeetingReport } from '@/types/meeting';
+import { createTestDb } from '@/__tests__/helpers/test-db';
+import { MeetingsRepository } from '@/lib/repositories/meetings.repository';
+import { TasksRepository } from '@/lib/repositories/tasks.repository';
+import * as schema from '@/lib/db/schema';
 
-let testDb: Database.Database;
+let testDb: BetterSQLite3Database<typeof schema>;
+let rawDb: Database.Database;
 
 function resetDb() {
-  if (testDb) testDb.close();
-  testDb = new Database(':memory:');
-  testDb.pragma('journal_mode = WAL');
-  testDb.pragma('foreign_keys = ON');
-  testDb.exec(`
-    CREATE TABLE IF NOT EXISTS meetings (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      raw_notes TEXT NOT NULL,
-      report_json TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_meetings_created_at ON meetings(created_at DESC);
-  `);
+  if (rawDb) rawDb.close();
+  const result = createTestDb();
+  testDb = result.db;
+  rawDb = result.rawDb;
 }
 
-jest.mock('@/lib/db', () => ({
-  getDb: () => testDb,
+jest.mock('@/lib/repositories', () => ({
+  getRepositories: () => ({
+    meetings: new MeetingsRepository(testDb),
+    tasks: new TasksRepository(testDb),
+  }),
 }));
 
 import { GET, DELETE } from '@/app/api/meetings/[id]/route';
@@ -39,7 +37,7 @@ const sampleReport: MeetingReport = {
 };
 
 function seedMeeting(id: string, title: string = 'Test Meeting') {
-  testDb.prepare(
+  rawDb.prepare(
     `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run(id, title, 'raw notes here', JSON.stringify(sampleReport), '2026-02-24T10:00:00.000Z', '2026-02-24T10:00:00.000Z');
@@ -52,7 +50,7 @@ function makeRequest(id: string, method: string = 'GET'): [Request, { params: { 
 
 describe('GET /api/meetings/[id]', () => {
   beforeEach(() => resetDb());
-  afterAll(() => testDb?.close());
+  afterAll(() => rawDb?.close());
 
   it('returns a full meeting record', async () => {
     seedMeeting('meet-1', 'My Meeting');
@@ -92,7 +90,7 @@ describe('GET /api/meetings/[id]', () => {
 
 describe('DELETE /api/meetings/[id]', () => {
   beforeEach(() => resetDb());
-  afterAll(() => testDb?.close());
+  afterAll(() => rawDb?.close());
 
   it('deletes a meeting and returns success', async () => {
     seedMeeting('del-1');
@@ -109,7 +107,7 @@ describe('DELETE /api/meetings/[id]', () => {
     const [req, context] = makeRequest('del-2', 'DELETE');
     await DELETE(req, context);
 
-    const row = testDb.prepare('SELECT id FROM meetings WHERE id = ?').get('del-2');
+    const row = rawDb.prepare('SELECT id FROM meetings WHERE id = ?').get('del-2');
     expect(row).toBeUndefined();
   });
 

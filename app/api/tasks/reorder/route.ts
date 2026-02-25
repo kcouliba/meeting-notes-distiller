@@ -1,4 +1,4 @@
-import { getDb } from '@/lib/db';
+import { getRepositories } from '@/lib/repositories';
 import { TaskStatus } from '@/types/meeting';
 import { NextResponse } from 'next/server';
 
@@ -28,20 +28,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const db = getDb();
-    const now = new Date().toISOString();
-
-    const stmt = db.prepare(
-      `UPDATE tasks SET status = ?, position = ?, updated_at = ? WHERE id = ?`
-    );
-
-    const transaction = db.transaction((items: ReorderUpdate[]) => {
-      for (const item of items) {
-        stmt.run(item.status, item.position, now, item.id);
-      }
-    });
-
-    transaction(updates);
+    getRepositories().tasks.reorder(updates);
 
     return NextResponse.json({ success: true });
   } catch (error) {

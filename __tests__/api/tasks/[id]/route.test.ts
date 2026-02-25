@@ -2,52 +2,39 @@
  * @jest-environment node
  */
 import Database from 'better-sqlite3';
+import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { createTestDb } from '@/__tests__/helpers/test-db';
+import { MeetingsRepository } from '@/lib/repositories/meetings.repository';
+import { TasksRepository } from '@/lib/repositories/tasks.repository';
+import * as schema from '@/lib/db/schema';
 
-let testDb: Database.Database;
+let testDb: BetterSQLite3Database<typeof schema>;
+let rawDb: Database.Database;
 
 function resetDb() {
-  if (testDb) testDb.close();
-  testDb = new Database(':memory:');
-  testDb.pragma('journal_mode = WAL');
-  testDb.pragma('foreign_keys = ON');
-  testDb.exec(`
-    CREATE TABLE IF NOT EXISTS meetings (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      raw_notes TEXT NOT NULL,
-      report_json TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS tasks (
-      id TEXT PRIMARY KEY,
-      meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
-      task TEXT NOT NULL,
-      assignee TEXT,
-      deadline TEXT,
-      status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo','in_progress','in_review','done')),
-      position INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
+  if (rawDb) rawDb.close();
+  const result = createTestDb();
+  testDb = result.db;
+  rawDb = result.rawDb;
 }
 
-jest.mock('@/lib/db', () => ({
-  getDb: () => testDb,
+jest.mock('@/lib/repositories', () => ({
+  getRepositories: () => ({
+    meetings: new MeetingsRepository(testDb),
+    tasks: new TasksRepository(testDb),
+  }),
 }));
 
 import { PATCH, DELETE } from '@/app/api/tasks/[id]/route';
 
 function seedData() {
-  testDb.prepare(
+  rawDb.prepare(
     `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run('m-1', 'Meeting', 'notes', '{}', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
 
   const now = '2026-01-01T00:00:00.000Z';
-  testDb.prepare(
+  rawDb.prepare(
     `INSERT INTO tasks (id, meeting_id, task, assignee, deadline, status, position, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run('t-1', 'm-1', 'Write tests', 'Alice', 'Feb 1', 'todo', 0, now, now);
@@ -76,7 +63,7 @@ describe('PATCH /api/tasks/[id]', () => {
     resetDb();
     seedData();
   });
-  afterAll(() => testDb?.close());
+  afterAll(() => rawDb?.close());
 
   it('updates task status', async () => {
     const [req, params] = makePatchRequest('t-1', { status: 'in_progress' });
@@ -84,7 +71,7 @@ describe('PATCH /api/tasks/[id]', () => {
 
     expect(res.status).toBe(200);
 
-    const row = testDb.prepare('SELECT status FROM tasks WHERE id = ?').get('t-1') as { status: string };
+    const row = rawDb.prepare('SELECT status FROM tasks WHERE id = ?').get('t-1') as { status: string };
     expect(row.status).toBe('in_progress');
   });
 
@@ -94,7 +81,7 @@ describe('PATCH /api/tasks/[id]', () => {
 
     expect(res.status).toBe(200);
 
-    const row = testDb.prepare('SELECT position FROM tasks WHERE id = ?').get('t-1') as { position: number };
+    const row = rawDb.prepare('SELECT position FROM tasks WHERE id = ?').get('t-1') as { position: number };
     expect(row.position).toBe(5);
   });
 
@@ -104,7 +91,7 @@ describe('PATCH /api/tasks/[id]', () => {
 
     expect(res.status).toBe(200);
 
-    const row = testDb.prepare('SELECT status, assignee, deadline FROM tasks WHERE id = ?').get('t-1') as {
+    const row = rawDb.prepare('SELECT status, assignee, deadline FROM tasks WHERE id = ?').get('t-1') as {
       status: string;
       assignee: string;
       deadline: string;
@@ -141,7 +128,7 @@ describe('DELETE /api/tasks/[id]', () => {
     resetDb();
     seedData();
   });
-  afterAll(() => testDb?.close());
+  afterAll(() => rawDb?.close());
 
   it('deletes an existing task', async () => {
     const [req, params] = makeDeleteRequest('t-1');
@@ -149,7 +136,7 @@ describe('DELETE /api/tasks/[id]', () => {
 
     expect(res.status).toBe(200);
 
-    const row = testDb.prepare('SELECT * FROM tasks WHERE id = ?').get('t-1');
+    const row = rawDb.prepare('SELECT * FROM tasks WHERE id = ?').get('t-1');
     expect(row).toBeUndefined();
   });
 
