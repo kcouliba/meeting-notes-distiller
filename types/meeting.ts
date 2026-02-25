@@ -16,6 +16,8 @@ export interface MeetingReport {
 
 export type OutputFormat = 'markdown' | 'slack' | 'email' | 'notion';
 
+export type AIProvider = 'gemini' | 'openai' | 'ollama';
+
 // --- File Upload Types ---
 
 export type SupportedFileExtension = '.vtt' | '.srt' | '.txt';

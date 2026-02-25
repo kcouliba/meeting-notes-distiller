@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - meeting-data:/app/data
+    env_file:
+      - .env.local
+    restart: unless-stopped
+
+  # To use Ollama for fully-private AI:
+  #   docker compose -f docker-compose.yml -f docker-compose.ollama.yml up
+
+volumes:
+  meeting-data:

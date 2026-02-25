@@ -1,16 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { SYSTEM_PROMPT } from '@/lib/prompts';
+import { getAIProvider } from '@/lib/ai';
 import { MeetingReport } from '@/types/meeting';
 import { NextResponse } from 'next/server';
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-const model = genAI.getGenerativeModel({
-  model: 'gemini-2.5-flash',
-  systemInstruction: SYSTEM_PROMPT,
-  generationConfig: {
-    responseMimeType: 'application/json',
-  },
-});
 
 export async function POST(req: Request) {
   try {
@@ -31,17 +21,17 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log(`[distill] Received ${notes.length} chars of notes`);
+    const provider = getAIProvider();
+    console.log(`[distill] Received ${notes.length} chars of notes (provider: ${provider.name})`);
 
     const startTime = Date.now();
-    const result = await model.generateContent(notes.trim());
+    const text = await provider.generate(notes.trim());
     const elapsed = Date.now() - startTime;
-    const text = result.response.text();
 
-    console.log(`[distill] Gemini responded in ${elapsed}ms (${text.length} chars)`);
+    console.log(`[distill] ${provider.name} responded in ${elapsed}ms (${text.length} chars)`);
 
     if (!text) {
-      console.error('[distill] Empty response from Gemini');
+      console.error(`[distill] Empty response from ${provider.name}`);
       return NextResponse.json(
         { error: 'No response received from AI' },
         { status: 500 }
