@@ -28,7 +28,7 @@ npm test
 npm run test:watch
 ```
 
-All 182 tests must pass before submitting a PR.
+All 216 tests must pass before submitting a PR.
 
 ## Project Architecture
 

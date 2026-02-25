@@ -87,7 +87,7 @@ The `-v meeting-data:/app/data` flag persists your meeting history and tasks acr
 │   └── prompts.ts         # AI prompt templates
 ├── types/
 │   └── meeting.ts         # TypeScript type definitions
-└── __tests__/             # Test suite (146 tests)
+└── __tests__/             # Test suite (216 tests)
 ```
 
 ## How It Works
