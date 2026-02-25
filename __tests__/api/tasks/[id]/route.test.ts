@@ -108,6 +108,16 @@ describe('PATCH /api/tasks/[id]', () => {
     expect(res.status).toBe(404);
   });
 
+  it('accepts archived status', async () => {
+    const [req, params] = makePatchRequest('t-1', { status: 'archived' });
+    const res = await PATCH(req, params);
+
+    expect(res.status).toBe(200);
+
+    const row = rawDb.prepare('SELECT status FROM tasks WHERE id = ?').get('t-1') as { status: string };
+    expect(row.status).toBe('archived');
+  });
+
   it('returns 400 for invalid status', async () => {
     const [req, params] = makePatchRequest('t-1', { status: 'invalid' });
     const res = await PATCH(req, params);

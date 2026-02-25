@@ -4,7 +4,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import path from 'path';
 import fs from 'fs';
 import * as schema from './schema';
-import { backfillTasks } from './migrate';
+import { backfillTasks, migrateTasksStatusConstraint } from './migrate';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'meetings.db');
 
@@ -25,6 +25,7 @@ export function getDb(): DrizzleDb {
 
     db = drizzle(rawDb, { schema });
     migrate(db, { migrationsFolder: path.join(process.cwd(), 'drizzle') });
+    migrateTasksStatusConstraint(rawDb);
     backfillTasks(rawDb);
   }
   return db;

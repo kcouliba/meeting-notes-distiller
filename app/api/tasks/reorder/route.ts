@@ -2,7 +2,7 @@ import { getRepositories } from '@/lib/repositories';
 import { TaskStatus } from '@/types/meeting';
 import { NextResponse } from 'next/server';
 
-const VALID_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'in_review', 'done'];
+const VALID_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'in_review', 'done', 'archived'];
 
 interface ReorderUpdate {
   id: string;

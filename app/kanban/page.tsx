@@ -42,6 +42,7 @@ export default function KanbanPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTask, setActiveTask] = useState<TaskRecord | null>(null);
   const [assigneeSuggestions, setAssigneeSuggestions] = useState<string[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -79,8 +80,12 @@ export default function KanbanPage() {
     fetchAssignees();
   }, [fetchTasks, fetchAssignees]);
 
-  const totalTasks = tasks.length;
-  const boardIsEmpty = !isLoading && totalTasks === 0;
+  const archivedTasks = tasks
+    .filter((t) => t.status === "archived")
+    .sort((a, b) => a.position - b.position);
+
+  const activeTasks = tasks.filter((t) => t.status !== "archived");
+  const boardIsEmpty = !isLoading && activeTasks.length === 0 && archivedTasks.length === 0;
 
   async function handleUpdateTask(id: string, fields: { title?: string; assignee?: string | null; deadline?: string | null; task?: string }) {
     // Optimistic update
@@ -107,6 +112,20 @@ export default function KanbanPage() {
 
     try {
       const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+      if (!res.ok) fetchTasks();
+    } catch {
+      fetchTasks();
+    }
+  }
+
+  async function handleArchiveAll() {
+    // Optimistic update: mark all done tasks as archived
+    setTasks((prev) =>
+      prev.map((t) => (t.status === "done" ? { ...t, status: "archived" as TaskStatus } : t))
+    );
+
+    try {
+      const res = await fetch("/api/tasks/archive", { method: "POST" });
       if (!res.ok) fetchTasks();
     } catch {
       fetchTasks();
@@ -250,6 +269,21 @@ export default function KanbanPage() {
             </p>
           </div>
         ) : (
+          <>
+          {archivedTasks.length > 0 && (
+            <div className="flex items-center gap-2 mb-4">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(e) => setShowArchived(e.target.checked)}
+                  className="rounded border-muted-foreground/50"
+                />
+                Show archived ({archivedTasks.length})
+              </label>
+            </div>
+          )}
+
           <DndContext
             sensors={sensors}
             collisionDetection={collisionDetection}
@@ -269,6 +303,10 @@ export default function KanbanPage() {
                   assigneeSuggestions={assigneeSuggestions}
                   onUpdate={handleUpdateTask}
                   onDelete={handleDeleteTask}
+                  {...(col.status === "done" ? {
+                    onArchiveAll: handleArchiveAll,
+                    archivedTasks: showArchived ? archivedTasks : undefined,
+                  } : {})}
                 />
               ))}
             </div>
@@ -277,6 +315,7 @@ export default function KanbanPage() {
               {activeTask ? <TaskCard task={activeTask} isDragOverlay /> : null}
             </DragOverlay>
           </DndContext>
+          </>
         )}
       </main>
 

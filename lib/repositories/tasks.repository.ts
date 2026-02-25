@@ -1,4 +1,4 @@
-import { eq, inArray, isNotNull } from 'drizzle-orm';
+import { eq, inArray, isNotNull, and, lte } from 'drizzle-orm';
 import { meetings, tasks } from '@/lib/db/schema';
 import type { DrizzleDb } from '@/lib/db';
 import { TaskRecord, TaskStatus, MeetingReport } from '@/types/meeting';
@@ -39,7 +39,7 @@ export class TasksRepository {
       .from(tasks)
       .innerJoin(meetings, eq(tasks.meetingId, meetings.id));
 
-    const validStatuses: TaskStatus[] = ['todo', 'in_progress', 'in_review', 'done'];
+    const validStatuses: TaskStatus[] = ['todo', 'in_progress', 'in_review', 'done', 'archived'];
 
     if (statusFilter) {
       const statuses = statusFilter
@@ -112,6 +112,31 @@ export class TasksRepository {
           .run();
       }
     });
+  }
+
+  archiveStale(daysThreshold = 7): number {
+    const cutoff = new Date(Date.now() - daysThreshold * 24 * 60 * 60 * 1000).toISOString();
+    const now = new Date().toISOString();
+
+    const result = this.db
+      .update(tasks)
+      .set({ status: 'archived', updatedAt: now })
+      .where(and(eq(tasks.status, 'done'), lte(tasks.updatedAt, cutoff)))
+      .run();
+
+    return result.changes;
+  }
+
+  archiveDone(): number {
+    const now = new Date().toISOString();
+
+    const result = this.db
+      .update(tasks)
+      .set({ status: 'archived', updatedAt: now })
+      .where(eq(tasks.status, 'done'))
+      .run();
+
+    return result.changes;
   }
 
   listAssignees(): string[] {

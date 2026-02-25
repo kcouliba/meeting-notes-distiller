@@ -4,10 +4,13 @@ import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
   try {
+    const repos = getRepositories();
+    repos.tasks.archiveStale();
+
     const { searchParams } = new URL(req.url);
     const statusFilter = searchParams.get('status');
 
-    const tasks = getRepositories().tasks.list(statusFilter);
+    const tasks = repos.tasks.list(statusFilter);
 
     const response: TaskListResponse = { tasks };
     return NextResponse.json(response);

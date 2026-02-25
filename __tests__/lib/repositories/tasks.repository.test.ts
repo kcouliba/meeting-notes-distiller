@@ -191,6 +191,73 @@ describe('TasksRepository', () => {
     });
   });
 
+  describe('archiveDone()', () => {
+    it('archives all done tasks and returns count', () => {
+      // t-4 is the only 'done' task in seed data
+      const count = repo.archiveDone();
+      expect(count).toBe(1);
+
+      const row = rawDb.prepare('SELECT status FROM tasks WHERE id = ?').get('t-4') as { status: string };
+      expect(row.status).toBe('archived');
+    });
+
+    it('returns 0 when no done tasks exist', () => {
+      rawDb.exec("UPDATE tasks SET status = 'todo'");
+      expect(repo.archiveDone()).toBe(0);
+    });
+
+    it('does not affect non-done tasks', () => {
+      repo.archiveDone();
+
+      const t1 = rawDb.prepare('SELECT status FROM tasks WHERE id = ?').get('t-1') as { status: string };
+      const t2 = rawDb.prepare('SELECT status FROM tasks WHERE id = ?').get('t-2') as { status: string };
+      expect(t1.status).toBe('todo');
+      expect(t2.status).toBe('in_progress');
+    });
+
+    it('sets updatedAt on archived tasks', () => {
+      const before = rawDb.prepare('SELECT updated_at FROM tasks WHERE id = ?').get('t-4') as { updated_at: string };
+      repo.archiveDone();
+      const after = rawDb.prepare('SELECT updated_at FROM tasks WHERE id = ?').get('t-4') as { updated_at: string };
+      expect(after.updated_at).not.toBe(before.updated_at);
+    });
+  });
+
+  describe('archiveStale()', () => {
+    it('archives done tasks older than threshold', () => {
+      // Seed data has updatedAt = 2026-01-01, so 7 days threshold from "now" should catch it
+      const count = repo.archiveStale(7);
+      expect(count).toBe(1);
+
+      const row = rawDb.prepare('SELECT status FROM tasks WHERE id = ?').get('t-4') as { status: string };
+      expect(row.status).toBe('archived');
+    });
+
+    it('does not archive recent done tasks', () => {
+      // Set t-4 updatedAt to now so it's within the threshold
+      rawDb.prepare('UPDATE tasks SET updated_at = ? WHERE id = ?').run(new Date().toISOString(), 't-4');
+
+      const count = repo.archiveStale(7);
+      expect(count).toBe(0);
+
+      const row = rawDb.prepare('SELECT status FROM tasks WHERE id = ?').get('t-4') as { status: string };
+      expect(row.status).toBe('done');
+    });
+
+    it('uses default threshold of 7 days', () => {
+      const count = repo.archiveStale();
+      expect(count).toBe(1);
+    });
+
+    it('does not archive non-done tasks regardless of age', () => {
+      // t-1 is 'todo' with old updatedAt, should not be archived
+      const count = repo.archiveStale(7);
+      const t1 = rawDb.prepare('SELECT status FROM tasks WHERE id = ?').get('t-1') as { status: string };
+      expect(t1.status).toBe('todo');
+      expect(count).toBe(1); // only t-4
+    });
+  });
+
   describe('listAssignees()', () => {
     it('returns sorted, deduplicated assignees from tasks and meeting participants', () => {
       const assignees = repo.listAssignees();

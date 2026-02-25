@@ -3,6 +3,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { SortableTaskCard } from "./SortableTaskCard";
+import { TaskCard } from "./TaskCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TaskRecord, TaskStatus } from "@/types/meeting";
 
@@ -22,9 +23,11 @@ interface KanbanColumnProps {
   assigneeSuggestions?: string[];
   onUpdate?: (id: string, fields: { title?: string; assignee?: string | null; deadline?: string | null; task?: string }) => void;
   onDelete?: (id: string) => void;
+  onArchiveAll?: () => void;
+  archivedTasks?: TaskRecord[];
 }
 
-export function KanbanColumn({ status, title, color = "blue", tasks, isLoading, assigneeSuggestions, onUpdate, onDelete }: KanbanColumnProps) {
+export function KanbanColumn({ status, title, color = "blue", tasks, isLoading, assigneeSuggestions, onUpdate, onDelete, onArchiveAll, archivedTasks }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
   const taskIds = tasks.map((t) => t.id);
@@ -39,9 +42,19 @@ export function KanbanColumn({ status, title, color = "blue", tasks, isLoading, 
       {/* Column header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <h3 className="text-sm font-semibold">{title}</h3>
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${styles.badge}`}>
-          {tasks.length}
-        </span>
+        <div className="flex items-center gap-2">
+          {onArchiveAll && tasks.length > 0 && (
+            <button
+              onClick={onArchiveAll}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Archive all
+            </button>
+          )}
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${styles.badge}`}>
+            {tasks.length}
+          </span>
+        </div>
       </div>
 
       {/* Card list */}
@@ -53,6 +66,7 @@ export function KanbanColumn({ status, title, color = "blue", tasks, isLoading, 
             <Skeleton className="h-20 w-full rounded-lg" />
           </>
         ) : (
+          <>
           <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
             {tasks.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-8">
@@ -70,6 +84,26 @@ export function KanbanColumn({ status, title, color = "blue", tasks, isLoading, 
               ))
             )}
           </SortableContext>
+
+          {archivedTasks && archivedTasks.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center gap-2 px-1">
+                <div className="flex-1 border-t border-dashed border-muted-foreground/30" />
+                <span className="text-xs text-muted-foreground">Archived ({archivedTasks.length})</span>
+                <div className="flex-1 border-t border-dashed border-muted-foreground/30" />
+              </div>
+              <div className="space-y-2 opacity-50">
+                {archivedTasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onDelete={onDelete}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>

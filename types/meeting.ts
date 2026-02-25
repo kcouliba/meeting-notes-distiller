@@ -84,7 +84,7 @@ export interface SaveMeetingResponse {
 
 // --- Task / Kanban Types ---
 
-export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done';
+export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done' | 'archived';
 
 export interface TaskRecord {
   id: string;

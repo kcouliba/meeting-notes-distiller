@@ -19,7 +19,7 @@ export const tasks = sqliteTable('tasks', {
   task: text('task').notNull(),
   assignee: text('assignee'),
   deadline: text('deadline'),
-  status: text('status', { enum: ['todo', 'in_progress', 'in_review', 'done'] }).notNull().default('todo'),
+  status: text('status', { enum: ['todo', 'in_progress', 'in_review', 'done', 'archived'] }).notNull().default('todo'),
   position: integer('position').notNull().default(0),
   createdAt: text('created_at').notNull().default("datetime('now')"),
   updatedAt: text('updated_at').notNull().default("datetime('now')"),
