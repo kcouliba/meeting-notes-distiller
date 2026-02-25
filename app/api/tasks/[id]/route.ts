@@ -16,11 +16,25 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       );
     }
 
+    if (body.title !== undefined) {
+      body.title = typeof body.title === 'string' ? body.title.trim() : '';
+    }
+
+    if (body.task !== undefined) {
+      const trimmed = typeof body.task === 'string' ? body.task.trim() : '';
+      if (trimmed === '') {
+        return NextResponse.json({ error: 'Task description cannot be empty' }, { status: 400 });
+      }
+      body.task = trimmed;
+    }
+
     const fields: Record<string, unknown> = {};
     if (body.status !== undefined) fields.status = body.status;
     if (body.position !== undefined) fields.position = body.position;
+    if (body.title !== undefined) fields.title = body.title;
     if (body.assignee !== undefined) fields.assignee = body.assignee;
     if (body.deadline !== undefined) fields.deadline = body.deadline;
+    if (body.task !== undefined) fields.task = body.task;
 
     if (Object.keys(fields).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });

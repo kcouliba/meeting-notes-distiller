@@ -7,6 +7,7 @@ Analyze the provided notes and extract the following:
 2. **DECISIONS**: List of decisions that were actually made/agreed upon during the meeting. Only include firm decisions, not ongoing discussions or suggestions.
 
 3. **ACTIONS**: Action items with:
+   - "title": Short title for the task (3-5 words, e.g. "Update API docs")
    - "task": Clear description of what needs to be done
    - "assignee": Person responsible (null if not specified)
    - "deadline": Due date if mentioned (null if not specified)
@@ -20,7 +21,7 @@ Return ONLY valid JSON matching this exact structure:
   "summary": ["point 1", "point 2"],
   "decisions": ["decision 1", "decision 2"],
   "actions": [
-    {"task": "description", "assignee": "name or null", "deadline": "date or null"}
+    {"title": "short title", "task": "description", "assignee": "name or null", "deadline": "date or null"}
   ],
   "pending": ["item 1", "item 2"],
   "participants": ["name 1", "name 2"]
@@ -34,4 +35,4 @@ Important rules:
 - Do not invent information that is not in the notes
 - Keep summary points concise but informative
 - Distinguish between decisions (firm) and discussions (pending)
-- Extract deadlines in their original format as written in the notes`;
+- Extract deadlines in YYYY-MM-DD format (e.g. 2026-03-15). Infer the year from context when not stated.`;

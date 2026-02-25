@@ -41,6 +41,7 @@ export default function KanbanPage() {
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTask, setActiveTask] = useState<TaskRecord | null>(null);
+  const [assigneeSuggestions, setAssigneeSuggestions] = useState<string[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -61,14 +62,27 @@ export default function KanbanPage() {
     }
   }, []);
 
+  const fetchAssignees = useCallback(async () => {
+    try {
+      const res = await fetch("/api/assignees");
+      if (res.ok) {
+        const data = await res.json();
+        setAssigneeSuggestions(data.assignees);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     fetchTasks();
-  }, [fetchTasks]);
+    fetchAssignees();
+  }, [fetchTasks, fetchAssignees]);
 
   const totalTasks = tasks.length;
   const boardIsEmpty = !isLoading && totalTasks === 0;
 
-  async function handleUpdateTask(id: string, fields: { assignee?: string | null; deadline?: string | null }) {
+  async function handleUpdateTask(id: string, fields: { title?: string; assignee?: string | null; deadline?: string | null; task?: string }) {
     // Optimistic update
     setTasks((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...fields } : t))
@@ -81,6 +95,7 @@ export default function KanbanPage() {
         body: JSON.stringify(fields),
       });
       if (!res.ok) fetchTasks();
+      else if (fields.assignee !== undefined) fetchAssignees();
     } catch {
       fetchTasks();
     }
@@ -251,6 +266,7 @@ export default function KanbanPage() {
                   color={col.color}
                   tasks={getTasksByStatus(col.status)}
                   isLoading={isLoading}
+                  assigneeSuggestions={assigneeSuggestions}
                   onUpdate={handleUpdateTask}
                   onDelete={handleDeleteTask}
                 />

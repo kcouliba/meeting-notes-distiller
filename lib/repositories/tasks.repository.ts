@@ -1,13 +1,15 @@
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, isNotNull } from 'drizzle-orm';
 import { meetings, tasks } from '@/lib/db/schema';
 import type { DrizzleDb } from '@/lib/db';
-import { TaskRecord, TaskStatus } from '@/types/meeting';
+import { TaskRecord, TaskStatus, MeetingReport } from '@/types/meeting';
 
 export interface TaskUpdateFields {
   status?: TaskStatus;
   position?: number;
+  title?: string;
   assignee?: string | null;
   deadline?: string | null;
+  task?: string;
 }
 
 export interface ReorderUpdate {
@@ -25,6 +27,7 @@ export class TasksRepository {
         id: tasks.id,
         meetingId: tasks.meetingId,
         meetingTitle: meetings.title,
+        title: tasks.title,
         task: tasks.task,
         assignee: tasks.assignee,
         deadline: tasks.deadline,
@@ -71,6 +74,12 @@ export class TasksRepository {
     if (fields.deadline !== undefined) {
       setClauses.deadline = fields.deadline;
     }
+    if (fields.title !== undefined) {
+      setClauses.title = fields.title;
+    }
+    if (fields.task !== undefined) {
+      setClauses.task = fields.task;
+    }
 
     setClauses.updatedAt = new Date().toISOString();
 
@@ -104,12 +113,49 @@ export class TasksRepository {
       }
     });
   }
+
+  listAssignees(): string[] {
+    // Get distinct non-null assignees from tasks
+    const taskAssignees = this.db
+      .selectDistinct({ assignee: tasks.assignee })
+      .from(tasks)
+      .where(isNotNull(tasks.assignee))
+      .all()
+      .map((row) => row.assignee!)
+      .filter((a) => a.trim() !== '');
+
+    // Extract participants from meetings.report_json
+    const meetingRows = this.db
+      .select({ reportJson: meetings.reportJson })
+      .from(meetings)
+      .all();
+
+    const participantSet = new Set<string>(taskAssignees);
+
+    for (const row of meetingRows) {
+      try {
+        const report: MeetingReport = JSON.parse(row.reportJson);
+        if (Array.isArray(report.participants)) {
+          for (const p of report.participants) {
+            if (typeof p === 'string' && p.trim() !== '') {
+              participantSet.add(p.trim());
+            }
+          }
+        }
+      } catch {
+        // skip malformed JSON
+      }
+    }
+
+    return Array.from(participantSet).sort((a, b) => a.localeCompare(b));
+  }
 }
 
 function mapTaskRow(row: {
   id: string;
   meetingId: string;
   meetingTitle: string;
+  title: string;
   task: string;
   assignee: string | null;
   deadline: string | null;
@@ -122,6 +168,7 @@ function mapTaskRow(row: {
     id: row.id,
     meetingId: row.meetingId,
     meetingTitle: row.meetingTitle,
+    title: row.title,
     task: row.task,
     assignee: row.assignee,
     deadline: row.deadline,

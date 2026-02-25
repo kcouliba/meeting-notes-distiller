@@ -20,6 +20,7 @@ export function createTestDb(): { db: BetterSQLite3Database<typeof schema>; rawD
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY,
       meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+      title TEXT NOT NULL DEFAULT '',
       task TEXT NOT NULL,
       assignee TEXT,
       deadline TEXT,

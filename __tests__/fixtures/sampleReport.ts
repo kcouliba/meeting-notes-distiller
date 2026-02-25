@@ -11,9 +11,9 @@ export const fullReport: MeetingReport = {
     'Marketing budget approved at $50k',
   ],
   actions: [
-    { task: 'Prepare the migration plan', assignee: 'Bob', deadline: 'Jan 30' },
-    { task: 'Send updated designs to client', assignee: 'Charlie', deadline: 'Feb 5' },
-    { task: 'Schedule follow-up with VP', assignee: 'Alice', deadline: null },
+    { title: 'Prepare migration', task: 'Prepare the migration plan', assignee: 'Bob', deadline: 'Jan 30' },
+    { title: 'Send designs', task: 'Send updated designs to client', assignee: 'Charlie', deadline: 'Feb 5' },
+    { title: 'Schedule follow-up', task: 'Schedule follow-up with VP', assignee: 'Alice', deadline: null },
   ],
   pending: [
     'Need to hire a contractor for frontend work?',
@@ -34,7 +34,7 @@ export const minimalReport: MeetingReport = {
   summary: ['Quick sync on project status'],
   decisions: [],
   actions: [
-    { task: 'Review the PR', assignee: null, deadline: null },
+    { title: 'Review PR', task: 'Review the PR', assignee: null, deadline: null },
   ],
   pending: [],
   participants: ['Alice'],

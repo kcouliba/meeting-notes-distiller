@@ -16,8 +16,8 @@ export function backfillTasks(db: Database.Database): void {
 
   const now = new Date().toISOString();
   const insert = db.prepare(
-    `INSERT INTO tasks (id, meeting_id, task, assignee, deadline, status, position, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'todo', ?, ?, ?)`
+    `INSERT INTO tasks (id, meeting_id, title, task, assignee, deadline, status, position, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'todo', ?, ?, ?)`
   );
 
   const run = db.transaction(() => {
@@ -34,6 +34,7 @@ export function backfillTasks(db: Database.Database): void {
         insert.run(
           crypto.randomUUID(),
           meeting.id,
+          action.title || '',
           action.task,
           action.assignee || null,
           action.deadline || null,

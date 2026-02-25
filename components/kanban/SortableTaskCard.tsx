@@ -7,11 +7,12 @@ import type { TaskRecord } from "@/types/meeting";
 
 interface SortableTaskCardProps {
   task: TaskRecord;
-  onUpdate?: (id: string, fields: { assignee?: string | null; deadline?: string | null }) => void;
+  assigneeSuggestions?: string[];
+  onUpdate?: (id: string, fields: { title?: string; assignee?: string | null; deadline?: string | null; task?: string }) => void;
   onDelete?: (id: string) => void;
 }
 
-export function SortableTaskCard({ task, onUpdate, onDelete }: SortableTaskCardProps) {
+export function SortableTaskCard({ task, assigneeSuggestions, onUpdate, onDelete }: SortableTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -32,6 +33,7 @@ export function SortableTaskCard({ task, onUpdate, onDelete }: SortableTaskCardP
       ref={setNodeRef}
       style={style}
       task={task}
+      assigneeSuggestions={assigneeSuggestions}
       onUpdate={onUpdate}
       onDelete={onDelete}
       {...attributes}

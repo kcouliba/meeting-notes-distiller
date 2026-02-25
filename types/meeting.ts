@@ -1,4 +1,5 @@
 export interface Action {
+  title: string;
   task: string;
   assignee: string | null;
   deadline: string | null;
@@ -89,6 +90,7 @@ export interface TaskRecord {
   id: string;
   meetingId: string;
   meetingTitle: string;
+  title: string;
   task: string;
   assignee: string | null;
   deadline: string | null;
@@ -105,6 +107,8 @@ export interface TaskListResponse {
 export interface TaskUpdateRequest {
   status?: TaskStatus;
   position?: number;
+  title?: string;
   assignee?: string | null;
   deadline?: string | null;
+  task?: string;
 }

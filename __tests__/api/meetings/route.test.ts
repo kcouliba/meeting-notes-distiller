@@ -32,7 +32,7 @@ import { POST, GET } from '@/app/api/meetings/route';
 const sampleReport: MeetingReport = {
   summary: ['Discussed Q1 roadmap and approved key initiatives'],
   decisions: ['Adopt the new CI/CD pipeline'],
-  actions: [{ task: 'Prepare migration plan', assignee: 'Bob', deadline: 'Jan 30' }],
+  actions: [{ title: 'Prepare migration', task: 'Prepare migration plan', assignee: 'Bob', deadline: 'Jan 30' }],
   pending: ['Hire contractor?'],
   participants: ['Alice', 'Bob'],
 };

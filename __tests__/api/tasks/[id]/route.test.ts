@@ -35,9 +35,9 @@ function seedData() {
 
   const now = '2026-01-01T00:00:00.000Z';
   rawDb.prepare(
-    `INSERT INTO tasks (id, meeting_id, task, assignee, deadline, status, position, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run('t-1', 'm-1', 'Write tests', 'Alice', 'Feb 1', 'todo', 0, now, now);
+    `INSERT INTO tasks (id, meeting_id, title, task, assignee, deadline, status, position, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run('t-1', 'm-1', 'Write tests', 'Write tests', 'Alice', 'Feb 1', 'todo', 0, now, now);
 }
 
 function makePatchRequest(id: string, body: Record<string, unknown>): [Request, { params: { id: string } }] {
@@ -120,6 +120,55 @@ describe('PATCH /api/tasks/[id]', () => {
     const res = await PATCH(req, params);
 
     expect(res.status).toBe(400);
+  });
+
+  it('updates task title', async () => {
+    const [req, params] = makePatchRequest('t-1', { title: 'New title' });
+    const res = await PATCH(req, params);
+
+    expect(res.status).toBe(200);
+
+    const row = rawDb.prepare('SELECT title FROM tasks WHERE id = ?').get('t-1') as { title: string };
+    expect(row.title).toBe('New title');
+  });
+
+  it('trims whitespace from title', async () => {
+    const [req, params] = makePatchRequest('t-1', { title: '  Trimmed title  ' });
+    const res = await PATCH(req, params);
+
+    expect(res.status).toBe(200);
+
+    const row = rawDb.prepare('SELECT title FROM tasks WHERE id = ?').get('t-1') as { title: string };
+    expect(row.title).toBe('Trimmed title');
+  });
+
+  it('updates task description', async () => {
+    const [req, params] = makePatchRequest('t-1', { task: 'Updated description' });
+    const res = await PATCH(req, params);
+
+    expect(res.status).toBe(200);
+
+    const row = rawDb.prepare('SELECT task FROM tasks WHERE id = ?').get('t-1') as { task: string };
+    expect(row.task).toBe('Updated description');
+  });
+
+  it('trims whitespace from task description', async () => {
+    const [req, params] = makePatchRequest('t-1', { task: '  Trimmed text  ' });
+    const res = await PATCH(req, params);
+
+    expect(res.status).toBe(200);
+
+    const row = rawDb.prepare('SELECT task FROM tasks WHERE id = ?').get('t-1') as { task: string };
+    expect(row.task).toBe('Trimmed text');
+  });
+
+  it('returns 400 for empty task description', async () => {
+    const [req, params] = makePatchRequest('t-1', { task: '   ' });
+    const res = await PATCH(req, params);
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe('Task description cannot be empty');
   });
 });
 

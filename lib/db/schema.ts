@@ -15,6 +15,7 @@ export const meetings = sqliteTable('meetings', {
 export const tasks = sqliteTable('tasks', {
   id: text('id').primaryKey(),
   meetingId: text('meeting_id').notNull().references(() => meetings.id, { onDelete: 'cascade' }),
+  title: text('title').notNull().default(''),
   task: text('task').notNull(),
   assignee: text('assignee'),
   deadline: text('deadline'),

@@ -35,6 +35,7 @@ export class MeetingsRepository {
         this.db.insert(tasks).values({
           id: crypto.randomUUID(),
           meetingId: id,
+          title: action.title || '',
           task: action.task,
           assignee: action.assignee || null,
           deadline: action.deadline || null,

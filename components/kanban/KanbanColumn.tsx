@@ -19,11 +19,12 @@ interface KanbanColumnProps {
   color?: string;
   tasks: TaskRecord[];
   isLoading?: boolean;
-  onUpdate?: (id: string, fields: { assignee?: string | null; deadline?: string | null }) => void;
+  assigneeSuggestions?: string[];
+  onUpdate?: (id: string, fields: { title?: string; assignee?: string | null; deadline?: string | null; task?: string }) => void;
   onDelete?: (id: string) => void;
 }
 
-export function KanbanColumn({ status, title, color = "blue", tasks, isLoading, onUpdate, onDelete }: KanbanColumnProps) {
+export function KanbanColumn({ status, title, color = "blue", tasks, isLoading, assigneeSuggestions, onUpdate, onDelete }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
   const taskIds = tasks.map((t) => t.id);
@@ -62,6 +63,7 @@ export function KanbanColumn({ status, title, color = "blue", tasks, isLoading, 
                 <SortableTaskCard
                   key={task.id}
                   task={task}
+                  assigneeSuggestions={assigneeSuggestions}
                   onUpdate={onUpdate}
                   onDelete={onDelete}
                 />

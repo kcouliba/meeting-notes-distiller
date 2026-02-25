@@ -31,7 +31,7 @@ import { GET, DELETE } from '@/app/api/meetings/[id]/route';
 const sampleReport: MeetingReport = {
   summary: ['Discussed Q1 roadmap'],
   decisions: ['Adopt CI/CD pipeline'],
-  actions: [{ task: 'Prepare plan', assignee: 'Bob', deadline: 'Jan 30' }],
+  actions: [{ title: 'Prepare plan', task: 'Prepare plan', assignee: 'Bob', deadline: 'Jan 30' }],
   pending: ['Hire contractor?'],
   participants: ['Alice', 'Bob'],
 };

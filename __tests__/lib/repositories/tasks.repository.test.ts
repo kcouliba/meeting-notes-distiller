@@ -12,10 +12,14 @@ let rawDb: Database.Database;
 let repo: TasksRepository;
 
 function seedData() {
+  const report1 = JSON.stringify({
+    summary: [], decisions: [], actions: [], pending: [],
+    participants: ['Alice', 'Eve'],
+  });
   rawDb.prepare(
     `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?)`
-  ).run('m-1', 'Sprint Planning', 'notes', '{}', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+  ).run('m-1', 'Sprint Planning', 'notes', report1, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
 
   rawDb.prepare(
     `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
@@ -24,13 +28,13 @@ function seedData() {
 
   const now = '2026-01-01T00:00:00.000Z';
   const insert = rawDb.prepare(
-    `INSERT INTO tasks (id, meeting_id, task, assignee, deadline, status, position, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tasks (id, meeting_id, title, task, assignee, deadline, status, position, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
-  insert.run('t-1', 'm-1', 'Write tests', 'Alice', 'Feb 1', 'todo', 0, now, now);
-  insert.run('t-2', 'm-1', 'Deploy app', 'Bob', null, 'in_progress', 0, now, now);
-  insert.run('t-3', 'm-2', 'Review PR', null, 'Feb 5', 'todo', 1, now, now);
-  insert.run('t-4', 'm-2', 'Fix bug', 'Charlie', null, 'done', 0, now, now);
+  insert.run('t-1', 'm-1', 'Write tests', 'Write tests', 'Alice', 'Feb 1', 'todo', 0, now, now);
+  insert.run('t-2', 'm-1', 'Deploy app', 'Deploy app', 'Bob', null, 'in_progress', 0, now, now);
+  insert.run('t-3', 'm-2', 'Review PR', 'Review PR', null, 'Feb 5', 'todo', 1, now, now);
+  insert.run('t-4', 'm-2', 'Fix bug', 'Fix bug', 'Charlie', null, 'done', 0, now, now);
 }
 
 beforeEach(() => {
@@ -53,6 +57,7 @@ describe('TasksRepository', () => {
       const t1 = tasks.find(t => t.id === 't-1');
       expect(t1).toBeDefined();
       expect(t1!.meetingTitle).toBe('Sprint Planning');
+      expect(t1!.title).toBe('Write tests');
       expect(t1!.task).toBe('Write tests');
       expect(t1!.assignee).toBe('Alice');
     });
@@ -125,6 +130,22 @@ describe('TasksRepository', () => {
       expect(after.updated_at).not.toBe(before.updated_at);
     });
 
+    it('updates title', () => {
+      const result = repo.update('t-1', { title: 'New title' });
+      expect(result).toBe(true);
+
+      const row = rawDb.prepare('SELECT title FROM tasks WHERE id = ?').get('t-1') as { title: string };
+      expect(row.title).toBe('New title');
+    });
+
+    it('updates task description', () => {
+      const result = repo.update('t-1', { task: 'Updated task text' });
+      expect(result).toBe(true);
+
+      const row = rawDb.prepare('SELECT task FROM tasks WHERE id = ?').get('t-1') as { task: string };
+      expect(row.task).toBe('Updated task text');
+    });
+
     it('returns false for missing ID', () => {
       expect(repo.update('nonexistent', { status: 'done' })).toBe(false);
     });
@@ -167,6 +188,50 @@ describe('TasksRepository', () => {
 
       const after = rawDb.prepare('SELECT updated_at FROM tasks WHERE id = ?').get('t-1') as { updated_at: string };
       expect(after.updated_at).not.toBe(before.updated_at);
+    });
+  });
+
+  describe('listAssignees()', () => {
+    it('returns sorted, deduplicated assignees from tasks and meeting participants', () => {
+      const assignees = repo.listAssignees();
+      // Task assignees: Alice, Bob, Charlie
+      // Meeting participants: Alice, Eve (from m-1)
+      expect(assignees).toEqual(['Alice', 'Bob', 'Charlie', 'Eve']);
+    });
+
+    it('returns empty array when no assignees or participants exist', () => {
+      rawDb.exec('DELETE FROM tasks');
+      rawDb.exec('DELETE FROM meetings');
+      rawDb.prepare(
+        `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run('m-empty', 'Empty', 'notes', '{}', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+
+      expect(repo.listAssignees()).toEqual([]);
+    });
+
+    it('skips null and empty assignees', () => {
+      rawDb.exec('DELETE FROM tasks');
+      const now = '2026-01-01T00:00:00.000Z';
+      rawDb.prepare(
+        `INSERT INTO tasks (id, meeting_id, task, assignee, deadline, status, position, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run('t-n', 'm-1', 'task', null, null, 'todo', 0, now, now);
+
+      const assignees = repo.listAssignees();
+      // Only Eve from m-1 participants (Alice no longer a task assignee, but still a participant)
+      expect(assignees).toEqual(['Alice', 'Eve']);
+    });
+
+    it('handles malformed report_json gracefully', () => {
+      rawDb.exec('DELETE FROM tasks');
+      rawDb.exec('DELETE FROM meetings');
+      rawDb.prepare(
+        `INSERT INTO meetings (id, title, raw_notes, report_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run('m-bad', 'Bad', 'notes', 'not-json', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+
+      expect(repo.listAssignees()).toEqual([]);
     });
   });
 });
